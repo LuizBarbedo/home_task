@@ -14,7 +14,7 @@ class SupabaseConfig {
   
   /// Chave anônima pública (anon key)
   /// Esta chave é segura para usar no cliente
-  static const String supabaseAnonKey = 'sb_publishable_jQQtYFNgAucsgkCJhDl8ZA_i1O716yF';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2anR3eHZmYXZwZnJpZGhzbWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjExNzAsImV4cCI6MjA4Mzk5NzE3MH0.99DOeIewz9kbhN9NjS8zpT0jLYlWOHC0s1qp12MiJD8';
   
   /// Verifica se as credenciais foram configuradas
   /// Retorna true se NÃO forem os placeholders padrão
