@@ -74,4 +74,35 @@ class UserModel {
           : DateTime.now(),
     );
   }
+
+  // Supabase serialization (snake_case)
+  Map<String, dynamic> toSupabase() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'avatar_url': avatarUrl,
+      'group_id': groupId,
+      'is_admin': isAdmin,
+      'weekly_points': weeklyPoints,
+      'total_points': totalPoints,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  factory UserModel.fromSupabase(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      email: json['email'] as String,
+      avatarUrl: json['avatar_url'] as String?,
+      groupId: json['group_id'] as String?,
+      isAdmin: json['is_admin'] as bool? ?? false,
+      weeklyPoints: json['weekly_points'] as int? ?? 0,
+      totalPoints: json['total_points'] as int? ?? 0,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+    );
+  }
 }

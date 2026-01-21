@@ -68,4 +68,32 @@ class TaskCompletionModel {
       photoUrl: json['photoUrl'] as String?,
     );
   }
+
+  // Supabase serialization (snake_case)
+  Map<String, dynamic> toSupabase() {
+    return {
+      'task_id': taskId,
+      'user_id': userId,
+      'group_id': groupId,
+      'points_earned': pointsEarned,
+      'completed_at': completedAt.toIso8601String(),
+      'notes': notes,
+      'photo_url': photoUrl,
+    };
+  }
+
+  factory TaskCompletionModel.fromSupabase(Map<String, dynamic> json) {
+    return TaskCompletionModel(
+      id: json['id'] as String,
+      taskId: json['task_id'] as String,
+      userId: json['user_id'] as String,
+      groupId: json['group_id'] as String,
+      pointsEarned: json['points_earned'] as int,
+      completedAt: json['completed_at'] != null
+          ? DateTime.parse(json['completed_at'] as String)
+          : DateTime.now(),
+      notes: json['notes'] as String?,
+      photoUrl: json['photo_url'] as String?,
+    );
+  }
 }

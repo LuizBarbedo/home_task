@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../theme/theme.dart';
+import '../../widgets/widgets.dart';
 import '../tasks/tasks_screen.dart';
 import '../ranking/ranking_screen.dart';
 import '../profile/profile_screen.dart';
@@ -65,26 +66,33 @@ class _MainScreenState extends State<MainScreen> {
             index: _currentIndex,
             children: screens,
           ),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, -5),
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Banner de anúncio (não aparece para usuários premium)
+              const BottomAdBanner(),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              items: items,
-            ),
+                child: BottomNavigationBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  items: items,
+                ),
+              ),
+            ],
           ),
         );
       },

@@ -4,6 +4,7 @@ import '../../services/services.dart';
 import '../../theme/theme.dart';
 import '../auth/login_screen.dart';
 import '../group/group_screen.dart';
+import '../premium_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -340,6 +341,42 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Opção Premium
+              Consumer<PurchaseService>(
+                builder: (context, purchaseService, child) {
+                  return ListTile(
+                    leading: Icon(
+                      Icons.workspace_premium,
+                      color: purchaseService.isPremium 
+                          ? Colors.amber 
+                          : Colors.grey,
+                    ),
+                    title: Text(
+                      purchaseService.isPremium 
+                          ? 'Você é Premium!' 
+                          : 'Seja Premium',
+                    ),
+                    subtitle: Text(
+                      purchaseService.isPremium 
+                          ? 'Sem anúncios' 
+                          : 'Remova os anúncios',
+                    ),
+                    trailing: purchaseService.isPremium
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PremiumScreen(),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const Divider(),
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('Notificações'),
@@ -385,12 +422,126 @@ class ProfileScreen extends StatelessWidget {
                   );
                 },
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text(
+                  'Excluir minha conta',
+                  style: TextStyle(color: Colors.red),
+                ),
+                subtitle: const Text('Remove permanentemente sua conta e dados'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteAccountDialog(context);
+                },
+              ),
               const SizedBox(height: 16),
             ],
           ),
         );
       },
     );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_rounded, color: Colors.red),
+              SizedBox(width: 12),
+              Text('Excluir Conta'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tem certeza que deseja excluir sua conta?\n',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('Esta ação é PERMANENTE e irá:'),
+              SizedBox(height: 8),
+              Text('• Remover seu perfil e dados pessoais'),
+              Text('• Excluir seu histórico de tarefas'),
+              Text('• Remover você de todos os grupos'),
+              SizedBox(height: 12),
+              Text(
+                'Não será possível recuperar sua conta após a exclusão.',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                await _deleteAccount(context);
+              },
+              child: const Text('Excluir Conta'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final success = await appState.deleteAccount();
+
+      Navigator.pop(context); // Fecha o loading
+
+      if (success) {
+        // Redireciona para login
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta excluída com sucesso'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao excluir conta. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Fecha o loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showLeaveGroupDialog(BuildContext context) {

@@ -73,4 +73,35 @@ class GroupModel {
           : null,
     );
   }
+
+  // Supabase serialization (snake_case)
+  Map<String, dynamic> toSupabase() {
+    return {
+      'name': name,
+      'code': code,
+      'admin_id': adminId,
+      'member_ids': memberIds,
+      'created_at': createdAt.toIso8601String(),
+      'week_start_date': weekStartDate.toIso8601String(),
+    };
+  }
+
+  factory GroupModel.fromSupabase(Map<String, dynamic> json) {
+    return GroupModel(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      code: json['code'] as String,
+      adminId: json['admin_id'] as String,
+      memberIds: (json['member_ids'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      weekStartDate: json['week_start_date'] != null
+          ? DateTime.parse(json['week_start_date'] as String)
+          : null,
+    );
+  }
 }

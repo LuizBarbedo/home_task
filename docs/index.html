@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excluir Conta - Tarefas em Casa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 40px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        h2 {
+            color: #333;
+            font-size: 18px;
+            margin: 24px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        .steps {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        .step-text {
+            color: #444;
+            line-height: 1.5;
+            padding-top: 3px;
+        }
+        .data-list {
+            background: #fff3f3;
+            border-left: 4px solid #e74c3c;
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 24px;
+        }
+        .data-list h3 {
+            color: #e74c3c;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .data-list ul {
+            list-style: none;
+            color: #666;
+        }
+        .data-list li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .data-list li::before {
+            content: "✕";
+            position: absolute;
+            left: 0;
+            color: #e74c3c;
+        }
+        .warning {
+            background: #fff8e6;
+            border: 1px solid #f5c518;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .warning-title {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        .warning-title::before {
+            content: "⚠️";
+            margin-right: 8px;
+        }
+        .warning p {
+            color: #856404;
+            font-size: 14px;
+        }
+        .contact {
+            text-align: center;
+            padding-top: 24px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .contact a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .app-name {
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🏠</div>
+            <h1>Excluir Conta</h1>
+            <p class="subtitle">Aplicativo <span class="app-name">Tarefas em Casa</span></p>
+        </div>
+
+        <h2>📱 Como excluir sua conta</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-text">Abra o aplicativo <strong>Tarefas em Casa</strong> no seu dispositivo</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-text">Toque na aba <strong>"Perfil"</strong> (ícone de pessoa na barra inferior)</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-text">Toque no ícone de <strong>configurações ⚙️</strong> no canto superior direito</div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-text">Role até o final e toque em <strong>"Excluir minha conta"</strong></div>
+            </div>
+            <div class="step">
+                <div class="step-number">5</div>
+                <div class="step-text">Leia o aviso e confirme tocando em <strong>"Excluir Conta"</strong></div>
+            </div>
+        </div>
+
+        <h2>🗑️ Dados que serão excluídos</h2>
+        <div class="data-list">
+            <h3>Remoção permanente de:</h3>
+            <ul>
+                <li>Seu perfil e informações pessoais (nome, e-mail)</li>
+                <li>Histórico completo de tarefas realizadas</li>
+                <li>Pontuação acumulada e posição no ranking</li>
+                <li>Participação em grupos familiares</li>
+                <li>Preferências e configurações do app</li>
+            </ul>
+        </div>
+
+        <div class="warning">
+            <div class="warning-title">Importante</div>
+            <p>A exclusão da conta é <strong>permanente e imediata</strong>. Todos os seus dados serão removidos dos nossos servidores e <strong>não poderão ser recuperados</strong>.</p>
+        </div>
+
+        <div class="contact">
+            <p>Desenvolvedor: <strong>Tarefas em Casa</strong></p>
+            <p>Dúvidas? Entre em contato: <a href="mailto:contato@tarefasemcasa.com">contato@tarefasemcasa.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

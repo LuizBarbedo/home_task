@@ -24,6 +24,9 @@ void main() async {
     ),
   );
 
+  // Inicializa serviços de ads e compras
+  await AdService().initialize();
+  
   runApp(const MyApp());
 }
 
@@ -32,8 +35,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppState()..init(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()..init()),
+        ChangeNotifierProvider(create: (_) => PurchaseService()..initialize()),
+      ],
       child: MaterialApp(
         title: 'Tarefas em Casa',
         debugShowCheckedModeBanner: false,

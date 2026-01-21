@@ -6,3 +6,4 @@ export 'tasks/tasks_screen.dart';
 export 'ranking/ranking_screen.dart';
 export 'admin/admin_screen.dart';
 export 'profile/profile_screen.dart';
+export 'premium_screen.dart';

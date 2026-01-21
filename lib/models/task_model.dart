@@ -100,6 +100,38 @@ class TaskModel {
     );
   }
 
+  // Supabase serialization (snake_case)
+  Map<String, dynamic> toSupabase() {
+    return {
+      'group_id': groupId,
+      'title': title,
+      'description': description,
+      'category': category.index,
+      'frequency': frequency.index,
+      'points': points,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'is_active': isActive,
+    };
+  }
+
+  factory TaskModel.fromSupabase(Map<String, dynamic> json) {
+    return TaskModel(
+      id: json['id'] as String,
+      groupId: json['group_id'] as String,
+      title: json['title'] as String,
+      description: json['description'] as String?,
+      category: TaskCategory.values[json['category'] as int],
+      frequency: TaskFrequency.values[json['frequency'] as int],
+      points: json['points'] as int,
+      createdBy: json['created_by'] as String,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      isActive: json['is_active'] as bool? ?? true,
+    );
+  }
+
   String get categoryName {
     switch (category) {
       case TaskCategory.cleaning:

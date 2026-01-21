@@ -1,7 +1,19 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
 import '../models/models.dart';
+import 'ad_service.dart';
 import 'storage_service.dart';
+import 'supabase_service.dart';
+
+/// Modo de operação do app
+enum AppMode {
+  /// Dados salvos apenas localmente (offline)
+  local,
+  /// Dados sincronizados com Supabase (online)
+  cloud,
+}
 
 class AppState extends ChangeNotifier {
   final StorageService _storage = StorageService();
@@ -13,6 +25,12 @@ class AppState extends ChangeNotifier {
   List<UserModel> _groupMembers = [];
   bool _isLoading = false;
   String? _error;
+  AppMode _mode = AppMode.local;
+  
+  // Subscriptions para real-time (Supabase)
+  RealtimeChannel? _tasksSubscription;
+  RealtimeChannel? _completionsSubscription;
+  RealtimeChannel? _membersSubscription;
 
   UserModel? get currentUser => _currentUser;
   GroupModel? get currentGroup => _currentGroup;
@@ -22,13 +40,41 @@ class AppState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
+  AppMode get mode => _mode;
+  bool get isCloudMode => _mode == AppMode.cloud;
 
   Future<void> init() async {
     await _storage.init();
-    await _loadCurrentUser();
+    
+    // Tenta inicializar Supabase se estiver configurado
+    if (SupabaseConfig.isConfigured) {
+      try {
+        await SupabaseService.initialize();
+        _mode = AppMode.cloud;
+        
+        // Verifica se há usuário autenticado
+        final authUser = SupabaseService.currentAuthUser;
+        if (authUser != null) {
+          _currentUser = await SupabaseService.getUserById(authUser.id);
+          if (_currentUser?.groupId != null) {
+            await loadGroupData(_currentUser!.groupId!);
+          }
+        }
+      } catch (e) {
+        // Se falhar, usa modo local
+        _mode = AppMode.local;
+        await _loadCurrentUserLocal();
+      }
+    } else {
+      // Supabase não configurado, usa modo local
+      _mode = AppMode.local;
+      await _loadCurrentUserLocal();
+    }
+    
+    notifyListeners();
   }
 
-  Future<void> _loadCurrentUser() async {
+  Future<void> _loadCurrentUserLocal() async {
     _isLoading = true;
     notifyListeners();
 
@@ -41,36 +87,58 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication
+  // ============================================================
+  // AUTENTICAÇÃO
+  // ============================================================
+  
   Future<bool> register(String name, String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final existingUser = await _storage.getUserByEmail(email);
-      if (existingUser != null) {
-        _error = 'Email já cadastrado';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+      if (_mode == AppMode.cloud) {
+        // Registro via Supabase
+        final user = await SupabaseService.signUp(
+          email: email,
+          password: password,
+          name: name,
+        );
+        
+        if (user == null) {
+          _error = 'Erro ao criar conta. Verifique seu email.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        
+        _currentUser = user;
+      } else {
+        // Registro local
+        final existingUser = await _storage.getUserByEmail(email);
+        if (existingUser != null) {
+          _error = 'Email já cadastrado';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        final user = UserModel(
+          id: _generateId(),
+          name: name,
+          email: email,
+        );
+
+        await _storage.saveUser(user);
+        await _storage.setCurrentUser(user);
+        _currentUser = user;
       }
-
-      final user = UserModel(
-        id: _generateId(),
-        name: name,
-        email: email,
-      );
-
-      await _storage.saveUser(user);
-      await _storage.setCurrentUser(user);
-      _currentUser = user;
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao criar conta';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -83,26 +151,48 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final user = await _storage.getUserByEmail(email);
-      if (user == null) {
-        _error = 'Usuário não encontrado';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
+      if (_mode == AppMode.cloud) {
+        // Login via Supabase
+        final user = await SupabaseService.signIn(
+          email: email,
+          password: password,
+        );
+        
+        if (user == null) {
+          _error = 'Email ou senha incorretos';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        
+        _currentUser = user;
+        
+        if (user.groupId != null) {
+          await loadGroupData(user.groupId!);
+        }
+      } else {
+        // Login local
+        final user = await _storage.getUserByEmail(email);
+        if (user == null) {
+          _error = 'Usuário não encontrado';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
 
-      await _storage.setCurrentUser(user);
-      _currentUser = user;
+        await _storage.setCurrentUser(user);
+        _currentUser = user;
 
-      if (user.groupId != null) {
-        await loadGroupData(user.groupId!);
+        if (user.groupId != null) {
+          await loadGroupData(user.groupId!);
+        }
       }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao fazer login';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -110,6 +200,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _cancelSubscriptions();
+    
+    if (_mode == AppMode.cloud) {
+      await SupabaseService.signOut();
+    }
+    
     await _storage.setCurrentUser(null);
     _currentUser = null;
     _currentGroup = null;
@@ -119,7 +215,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Group Management
+  // ============================================================
+  // GERENCIAMENTO DE GRUPO
+  // ============================================================
+  
   Future<bool> createGroup(String name) async {
     _isLoading = true;
     _error = null;
@@ -127,31 +226,52 @@ class AppState extends ChangeNotifier {
 
     try {
       final code = _generateGroupCode();
-      final group = GroupModel(
-        id: _generateId(),
-        name: name,
-        code: code,
-        adminId: _currentUser!.id,
-        memberIds: [_currentUser!.id],
-      );
+      
+      if (_mode == AppMode.cloud) {
+        // Criar grupo no Supabase
+        final group = await SupabaseService.createGroup(
+          name: name,
+          adminId: _currentUser!.id,
+          code: code,
+        );
+        
+        // Atualizar usuário
+        final updatedUser = _currentUser!.copyWith(
+          groupId: group.id,
+          isAdmin: true,
+        );
+        await SupabaseService.updateUser(updatedUser);
+        _currentUser = updatedUser;
+        
+        await loadGroupData(group.id);
+      } else {
+        // Criar grupo local
+        final group = GroupModel(
+          id: _generateId(),
+          name: name,
+          code: code,
+          adminId: _currentUser!.id,
+          memberIds: [_currentUser!.id],
+        );
 
-      await _storage.saveGroup(group);
+        await _storage.saveGroup(group);
 
-      final updatedUser = _currentUser!.copyWith(
-        groupId: group.id,
-        isAdmin: true,
-      );
-      await _storage.saveUser(updatedUser);
-      await _storage.setCurrentUser(updatedUser);
-      _currentUser = updatedUser;
+        final updatedUser = _currentUser!.copyWith(
+          groupId: group.id,
+          isAdmin: true,
+        );
+        await _storage.saveUser(updatedUser);
+        await _storage.setCurrentUser(updatedUser);
+        _currentUser = updatedUser;
 
-      await loadGroupData(group.id);
+        await loadGroupData(group.id);
+      }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao criar grupo';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -164,7 +284,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final group = await _storage.getGroupByCode(code);
+      GroupModel? group;
+      
+      if (_mode == AppMode.cloud) {
+        group = await SupabaseService.getGroupByCode(code);
+      } else {
+        group = await _storage.getGroupByCode(code);
+      }
+      
       if (group == null) {
         _error = 'Código de grupo inválido';
         _isLoading = false;
@@ -172,18 +299,31 @@ class AppState extends ChangeNotifier {
         return false;
       }
 
-      final updatedGroup = group.copyWith(
-        memberIds: [...group.memberIds, _currentUser!.id],
-      );
-      await _storage.saveGroup(updatedGroup);
+      if (_mode == AppMode.cloud) {
+        // Adicionar membro no Supabase
+        await SupabaseService.addMemberToGroup(group.id, _currentUser!.id);
+        
+        final updatedUser = _currentUser!.copyWith(
+          groupId: group.id,
+          isAdmin: false,
+        );
+        await SupabaseService.updateUser(updatedUser);
+        _currentUser = updatedUser;
+      } else {
+        // Adicionar membro local
+        final updatedGroup = group.copyWith(
+          memberIds: [...group.memberIds, _currentUser!.id],
+        );
+        await _storage.saveGroup(updatedGroup);
 
-      final updatedUser = _currentUser!.copyWith(
-        groupId: group.id,
-        isAdmin: false,
-      );
-      await _storage.saveUser(updatedUser);
-      await _storage.setCurrentUser(updatedUser);
-      _currentUser = updatedUser;
+        final updatedUser = _currentUser!.copyWith(
+          groupId: group.id,
+          isAdmin: false,
+        );
+        await _storage.saveUser(updatedUser);
+        await _storage.setCurrentUser(updatedUser);
+        _currentUser = updatedUser;
+      }
 
       await loadGroupData(group.id);
 
@@ -191,7 +331,7 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao entrar no grupo';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -199,14 +339,58 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loadGroupData(String groupId) async {
-    _currentGroup = await _storage.getGroupById(groupId);
-    _tasks = await _storage.getTasksByGroup(groupId);
-    _completions = await _storage.getWeeklyCompletions(groupId);
-    
-    final users = await _storage.getUsers();
-    _groupMembers = users.where((u) => u.groupId == groupId).toList();
+    if (_mode == AppMode.cloud) {
+      _currentGroup = await SupabaseService.getGroupById(groupId);
+      _tasks = await SupabaseService.getTasksByGroup(groupId);
+      _completions = await SupabaseService.getCompletionsByGroup(groupId);
+      _groupMembers = await SupabaseService.getGroupMembers(groupId);
+      
+      // Configurar subscriptions para real-time
+      _setupRealtimeSubscriptions(groupId);
+    } else {
+      _currentGroup = await _storage.getGroupById(groupId);
+      _tasks = await _storage.getTasksByGroup(groupId);
+      _completions = await _storage.getWeeklyCompletions(groupId);
+      
+      final users = await _storage.getUsers();
+      _groupMembers = users.where((u) => u.groupId == groupId).toList();
+    }
     
     notifyListeners();
+  }
+
+  void _setupRealtimeSubscriptions(String groupId) {
+    _cancelSubscriptions();
+    
+    _tasksSubscription = SupabaseService.subscribeToTasks(groupId, (tasks) {
+      _tasks = tasks;
+      notifyListeners();
+    });
+    
+    _completionsSubscription = SupabaseService.subscribeToCompletions(groupId, (completions) {
+      _completions = completions;
+      notifyListeners();
+    });
+    
+    _membersSubscription = SupabaseService.subscribeToGroupMembers(groupId, (members) {
+      _groupMembers = members;
+      notifyListeners();
+    });
+  }
+
+  void _cancelSubscriptions() {
+    if (_tasksSubscription != null) {
+      SupabaseService.unsubscribe(_tasksSubscription!);
+      _tasksSubscription = null;
+    }
+    if (_completionsSubscription != null) {
+      SupabaseService.unsubscribe(_completionsSubscription!);
+      _completionsSubscription = null;
+    }
+    if (_membersSubscription != null) {
+      SupabaseService.unsubscribe(_membersSubscription!);
+      _membersSubscription = null;
+    }
   }
 
   Future<void> leaveGroup() async {
@@ -216,20 +400,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final updatedGroup = _currentGroup!.copyWith(
-        memberIds: _currentGroup!.memberIds.where((id) => id != _currentUser!.id).toList(),
-      );
-      await _storage.saveGroup(updatedGroup);
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.removeMemberFromGroup(
+          _currentGroup!.id, 
+          _currentUser!.id,
+        );
+        
+        final updatedUser = _currentUser!.copyWith(
+          groupId: null,
+          isAdmin: false,
+          weeklyPoints: 0,
+        );
+        await SupabaseService.updateUser(updatedUser);
+        _currentUser = updatedUser;
+      } else {
+        final updatedGroup = _currentGroup!.copyWith(
+          memberIds: _currentGroup!.memberIds.where((id) => id != _currentUser!.id).toList(),
+        );
+        await _storage.saveGroup(updatedGroup);
 
-      final updatedUser = _currentUser!.copyWith(
-        groupId: null,
-        isAdmin: false,
-        weeklyPoints: 0,
-      );
-      await _storage.saveUser(updatedUser);
-      await _storage.setCurrentUser(updatedUser);
-      _currentUser = updatedUser;
+        final updatedUser = _currentUser!.copyWith(
+          groupId: null,
+          isAdmin: false,
+          weeklyPoints: 0,
+        );
+        await _storage.saveUser(updatedUser);
+        await _storage.setCurrentUser(updatedUser);
+        _currentUser = updatedUser;
+      }
 
+      _cancelSubscriptions();
       _currentGroup = null;
       _tasks = [];
       _completions = [];
@@ -238,13 +438,16 @@ class AppState extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _error = 'Erro ao sair do grupo';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Task Management
+  // ============================================================
+  // GERENCIAMENTO DE TAREFAS
+  // ============================================================
+  
   Future<bool> createTask({
     required String title,
     String? description,
@@ -269,14 +472,19 @@ class AppState extends ChangeNotifier {
         createdBy: _currentUser!.id,
       );
 
-      await _storage.saveTask(task);
-      _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.createTask(task);
+        _tasks = await SupabaseService.getTasksByGroup(_currentGroup!.id);
+      } else {
+        await _storage.saveTask(task);
+        _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao criar tarefa';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -290,14 +498,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _storage.saveTask(task);
-      _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.updateTask(task);
+        _tasks = await SupabaseService.getTasksByGroup(_currentGroup!.id);
+      } else {
+        await _storage.saveTask(task);
+        _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao atualizar tarefa';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -311,14 +524,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _storage.deleteTask(taskId);
-      _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.deleteTask(taskId);
+        _tasks = await SupabaseService.getTasksByGroup(_currentGroup!.id);
+      } else {
+        await _storage.deleteTask(taskId);
+        _tasks = await _storage.getTasksByGroup(_currentGroup!.id);
+      }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao excluir tarefa';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -341,30 +559,49 @@ class AppState extends ChangeNotifier {
         notes: notes,
       );
 
-      await _storage.saveCompletion(completion);
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.createCompletion(completion);
+        
+        final updatedUser = _currentUser!.copyWith(
+          weeklyPoints: _currentUser!.weeklyPoints + task.points,
+          totalPoints: _currentUser!.totalPoints + task.points,
+        );
+        await SupabaseService.updateUser(updatedUser);
+        _currentUser = updatedUser;
+        
+        await loadGroupData(_currentGroup!.id);
+      } else {
+        await _storage.saveCompletion(completion);
 
-      final updatedUser = _currentUser!.copyWith(
-        weeklyPoints: _currentUser!.weeklyPoints + task.points,
-        totalPoints: _currentUser!.totalPoints + task.points,
-      );
-      await _storage.saveUser(updatedUser);
-      await _storage.setCurrentUser(updatedUser);
-      _currentUser = updatedUser;
+        final updatedUser = _currentUser!.copyWith(
+          weeklyPoints: _currentUser!.weeklyPoints + task.points,
+          totalPoints: _currentUser!.totalPoints + task.points,
+        );
+        await _storage.saveUser(updatedUser);
+        await _storage.setCurrentUser(updatedUser);
+        _currentUser = updatedUser;
 
-      await loadGroupData(_currentGroup!.id);
+        await loadGroupData(_currentGroup!.id);
+      }
+
+      // Notifica o serviço de anúncios (pode mostrar intersticial)
+      await AdService().onTaskCompleted();
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao completar tarefa';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // Ranking
+  // ============================================================
+  // RANKING
+  // ============================================================
+  
   List<UserModel> getWeeklyRanking() {
     final sorted = List<UserModel>.from(_groupMembers);
     sorted.sort((a, b) => b.weeklyPoints.compareTo(a.weeklyPoints));
@@ -385,7 +622,10 @@ class AppState extends ChangeNotifier {
     return index >= 0 ? index + 1 : 0;
   }
 
-  // Admin Functions
+  // ============================================================
+  // FUNÇÕES DE ADMIN
+  // ============================================================
+  
   Future<void> resetWeeklyRanking() async {
     if (!isAdmin || _currentGroup == null) return;
 
@@ -393,17 +633,27 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _storage.resetWeeklyPoints(_currentGroup!.id);
-      await loadGroupData(_currentGroup!.id);
-      
-      // Reload current user
-      _currentUser = await _storage.getUserById(_currentUser!.id);
-      await _storage.setCurrentUser(_currentUser);
+      if (_mode == AppMode.cloud) {
+        // Reset points para todos os membros
+        for (final member in _groupMembers) {
+          final updatedMember = member.copyWith(weeklyPoints: 0);
+          await SupabaseService.updateUser(updatedMember);
+        }
+        
+        _currentUser = _currentUser!.copyWith(weeklyPoints: 0);
+        await loadGroupData(_currentGroup!.id);
+      } else {
+        await _storage.resetWeeklyPoints(_currentGroup!.id);
+        await loadGroupData(_currentGroup!.id);
+        
+        _currentUser = await _storage.getUserById(_currentUser!.id);
+        await _storage.setCurrentUser(_currentUser);
+      }
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _error = 'Erro ao resetar ranking';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
     }
@@ -417,35 +667,88 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final user = await _storage.getUserById(userId);
-      if (user != null) {
-        final updatedUser = user.copyWith(
-          groupId: null,
-          isAdmin: false,
-          weeklyPoints: 0,
+      if (_mode == AppMode.cloud) {
+        final user = await SupabaseService.getUserById(userId);
+        if (user != null) {
+          final updatedUser = user.copyWith(
+            groupId: null,
+            isAdmin: false,
+            weeklyPoints: 0,
+          );
+          await SupabaseService.updateUser(updatedUser);
+        }
+        
+        await SupabaseService.removeMemberFromGroup(_currentGroup!.id, userId);
+        await loadGroupData(_currentGroup!.id);
+      } else {
+        final user = await _storage.getUserById(userId);
+        if (user != null) {
+          final updatedUser = user.copyWith(
+            groupId: null,
+            isAdmin: false,
+            weeklyPoints: 0,
+          );
+          await _storage.saveUser(updatedUser);
+        }
+
+        final updatedGroup = _currentGroup!.copyWith(
+          memberIds: _currentGroup!.memberIds.where((id) => id != userId).toList(),
         );
-        await _storage.saveUser(updatedUser);
+        await _storage.saveGroup(updatedGroup);
+
+        await loadGroupData(_currentGroup!.id);
       }
-
-      final updatedGroup = _currentGroup!.copyWith(
-        memberIds: _currentGroup!.memberIds.where((id) => id != userId).toList(),
-      );
-      await _storage.saveGroup(updatedGroup);
-
-      await loadGroupData(_currentGroup!.id);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Erro ao remover membro';
+      _error = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // Helpers
+  // ============================================================
+  // EXCLUSÃO DE CONTA
+  // ============================================================
+  
+  Future<bool> deleteAccount() async {
+    if (_currentUser == null) return false;
+    
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Se estiver em um grupo, sair primeiro
+      if (_currentGroup != null) {
+        await leaveGroup();
+      }
+      
+      if (_mode == AppMode.cloud) {
+        await SupabaseService.deleteAccount(_currentUser!.id);
+        await SupabaseService.signOut();
+      }
+      
+      await _storage.setCurrentUser(null);
+      _currentUser = null;
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _parseError(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  
   String _generateId() {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final random = Random();
@@ -458,8 +761,30 @@ class AppState extends ChangeNotifier {
     return List.generate(6, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
+  String _parseError(dynamic e) {
+    if (e is AuthException) {
+      switch (e.message) {
+        case 'Invalid login credentials':
+          return 'Email ou senha incorretos';
+        case 'User already registered':
+          return 'Este email já está cadastrado';
+        case 'Email not confirmed':
+          return 'Confirme seu email antes de fazer login';
+        default:
+          return e.message;
+      }
+    }
+    return 'Ocorreu um erro. Tente novamente.';
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+  
+  @override
+  void dispose() {
+    _cancelSubscriptions();
+    super.dispose();
   }
 }
