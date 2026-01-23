@@ -9,23 +9,35 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    debugPrint('Erro ao definir orientação: $e');
+  }
 
   // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  try {
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+  } catch (e) {
+    debugPrint('Erro ao definir UI overlay: $e');
+  }
 
-  // Inicializa serviços de ads e compras
-  await AdService().initialize();
+  // Inicializa serviços de ads (com tratamento de erro)
+  try {
+    await AdService().initialize();
+  } catch (e) {
+    debugPrint('Erro ao inicializar AdService: $e');
+  }
   
   runApp(const MyApp());
 }

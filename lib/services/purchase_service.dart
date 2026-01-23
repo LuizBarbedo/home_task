@@ -50,35 +50,39 @@ class PurchaseService extends ChangeNotifier {
 
   /// Inicializa o serviço de compras
   Future<void> initialize() async {
-    // Não disponível em plataformas não suportadas
-    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
-      debugPrint('In-App Purchase não suportado nesta plataforma');
-      return;
+    try {
+      // Não disponível em plataformas não suportadas
+      if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+        debugPrint('In-App Purchase não suportado nesta plataforma');
+        return;
+      }
+      
+      // Carrega status premium salvo localmente
+      await _loadPremiumStatus();
+      
+      // Verifica disponibilidade da loja
+      _isAvailable = await _inAppPurchase.isAvailable();
+      
+      if (!_isAvailable) {
+        debugPrint('Loja não disponível');
+        return;
+      }
+      
+      // Escuta atualizações de compras
+      _subscription = _inAppPurchase.purchaseStream.listen(
+        _onPurchaseUpdated,
+        onDone: _onDone,
+        onError: _onError,
+      );
+      
+      // Carrega produtos disponíveis
+      await _loadProducts();
+      
+      // Restaura compras anteriores
+      await restorePurchases();
+    } catch (e) {
+      debugPrint('Erro ao inicializar PurchaseService: $e');
     }
-    
-    // Carrega status premium salvo localmente
-    await _loadPremiumStatus();
-    
-    // Verifica disponibilidade da loja
-    _isAvailable = await _inAppPurchase.isAvailable();
-    
-    if (!_isAvailable) {
-      debugPrint('Loja não disponível');
-      return;
-    }
-    
-    // Escuta atualizações de compras
-    _subscription = _inAppPurchase.purchaseStream.listen(
-      _onPurchaseUpdated,
-      onDone: _onDone,
-      onError: _onError,
-    );
-    
-    // Carrega produtos disponíveis
-    await _loadProducts();
-    
-    // Restaura compras anteriores
-    await restorePurchases();
   }
 
   /// Carrega os produtos da loja

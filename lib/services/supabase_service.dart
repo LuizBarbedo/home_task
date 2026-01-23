@@ -33,24 +33,38 @@ class SupabaseService {
     required String password,
     required String name,
   }) async {
-    final response = await _client.auth.signUp(
-      email: email,
-      password: password,
-      data: {'name': name},
-    );
-    
-    if (response.user == null) return null;
-    
-    // Cria o perfil do usuário na tabela users
-    final user = UserModel(
-      id: response.user!.id,
-      name: name,
-      email: email,
-    );
-    
-    await _client.from('users').upsert(user.toSupabase());
-    
-    return user;
+    try {
+      print('📝 Iniciando cadastro: $email');
+      
+      final response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'name': name},
+      );
+      
+      print('📝 Resposta auth: ${response.user?.id}');
+      
+      if (response.user == null) {
+        print('❌ User é null após signUp');
+        return null;
+      }
+      
+      // Cria o perfil do usuário na tabela users
+      final user = UserModel(
+        id: response.user!.id,
+        name: name,
+        email: email,
+      );
+      
+      print('📝 Tentando inserir na tabela users...');
+      await _client.from('users').upsert(user.toSupabase());
+      print('✅ Usuário inserido com sucesso!');
+      
+      return user;
+    } catch (e) {
+      print('❌ Erro no signUp: $e');
+      rethrow;
+    }
   }
   
   /// Faz login com email e senha

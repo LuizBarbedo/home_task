@@ -44,7 +44,11 @@ class AppState extends ChangeNotifier {
   bool get isCloudMode => _mode == AppMode.cloud;
 
   Future<void> init() async {
-    await _storage.init();
+    try {
+      await _storage.init();
+    } catch (e) {
+      debugPrint('Erro ao inicializar storage: $e');
+    }
     
     // Tenta inicializar Supabase se estiver configurado
     if (SupabaseConfig.isConfigured) {
@@ -62,13 +66,22 @@ class AppState extends ChangeNotifier {
         }
       } catch (e) {
         // Se falhar, usa modo local
+        debugPrint('Erro ao inicializar Supabase: $e');
         _mode = AppMode.local;
-        await _loadCurrentUserLocal();
+        try {
+          await _loadCurrentUserLocal();
+        } catch (e2) {
+          debugPrint('Erro ao carregar usuário local: $e2');
+        }
       }
     } else {
       // Supabase não configurado, usa modo local
       _mode = AppMode.local;
-      await _loadCurrentUserLocal();
+      try {
+        await _loadCurrentUserLocal();
+      } catch (e) {
+        debugPrint('Erro ao carregar usuário local: $e');
+      }
     }
     
     notifyListeners();
