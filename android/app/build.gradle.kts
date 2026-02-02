@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.tarefasemcasa.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36  // Necessário para as dependências mais recentes
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -33,8 +33,8 @@ android {
         applicationId = "com.tarefasemcasa.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = flutter.minSdkVersion  // Android 6.0+
+        targetSdk = 35  // Android 15
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

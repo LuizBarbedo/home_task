@@ -1,4 +1,4 @@
-package com.example.task_app
+package com.tarefasemcasa.app
 
 import io.flutter.embedding.android.FlutterActivity
 
