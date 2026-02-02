@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/services.dart';
@@ -6,40 +8,66 @@ import 'theme/theme.dart';
 import 'screens/screens.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Set preferred orientations
-  try {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-  } catch (e) {
-    debugPrint('Erro ao definir orientação: $e');
-  }
+  // Captura erros globais para evitar crashes silenciosos
+  await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // Set preferred orientations
+    try {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    } catch (e) {
+      debugPrint('Erro ao definir orientação: $e');
+    }
 
-  // Set system UI overlay style
-  try {
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-  } catch (e) {
-    debugPrint('Erro ao definir UI overlay: $e');
-  }
+    // Set system UI overlay style
+    try {
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Erro ao definir UI overlay: $e');
+    }
 
-  // Inicializa serviços de ads (com tratamento de erro)
-  try {
-    await AdService().initialize();
-  } catch (e) {
-    debugPrint('Erro ao inicializar AdService: $e');
-  }
+    // Inicializa serviços de ads (com tratamento de erro robusto)
+    // IMPORTANTE: Não bloquear a inicialização do app se os ads falharem
+    try {
+      // Timeout para evitar que a inicialização do AdMob trave o app
+      await AdService().initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('AdService: Timeout na inicialização');
+        },
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Erro ao inicializar AdService: $e');
+      debugPrint('StackTrace: $stackTrace');
+      // Não rethrow - o app deve continuar mesmo sem ads
+    }
+    
+    runApp(const MyApp());
+  }, (error, stackTrace) {
+    // Log de erros não capturados
+    debugPrint('ERRO NÃO CAPTURADO: $error');
+    debugPrint('StackTrace: $stackTrace');
+  });
   
-  runApp(const MyApp());
+  // Captura erros do Flutter Framework
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('Flutter Error: ${details.exception}');
+    debugPrint('StackTrace: ${details.stack}');
+    // Em produção, você pode enviar para um serviço de crash reporting
+    if (kReleaseMode) {
+      // Crashlytics, Sentry, etc.
+    }
+  };
 }
 
 class MyApp extends StatelessWidget {

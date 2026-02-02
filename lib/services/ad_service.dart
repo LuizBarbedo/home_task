@@ -39,15 +39,32 @@ class AdService {
     }
     
     try {
-      await MobileAds.instance.initialize();
+      debugPrint('AdMob: Iniciando inicialização...');
+      
+      // Inicializa o SDK com timeout para evitar travamento
+      final initStatus = await MobileAds.instance.initialize();
+      
+      // Log do status de cada adapter
+      initStatus.adapterStatuses.forEach((key, value) {
+        debugPrint('AdMob Adapter: $key => ${value.state.name}');
+      });
+      
       _isInitialized = true;
       debugPrint('AdMob inicializado com sucesso');
       
-      // Pré-carrega os anúncios
-      await loadBannerAd();
-      await loadInterstitialAd();
-    } catch (e) {
+      // Pré-carrega os anúncios de forma assíncrona (não bloqueia)
+      // Usar Future.delayed para dar tempo ao SDK se estabilizar
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_isInitialized) {
+          loadBannerAd();
+          loadInterstitialAd();
+        }
+      });
+    } catch (e, stackTrace) {
       debugPrint('Erro ao inicializar AdMob: $e');
+      debugPrint('StackTrace: $stackTrace');
+      // Marca como não inicializado mas não propaga o erro
+      _isInitialized = false;
     }
   }
 

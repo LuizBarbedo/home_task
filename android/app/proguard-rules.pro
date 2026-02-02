@@ -34,3 +34,84 @@
 # Keep SharedPreferences
 -keep class android.content.SharedPreferences { *; }
 -keep class android.content.SharedPreferences$Editor { *; }
+
+# ============================================================
+# GOOGLE MOBILE ADS (AdMob)
+# ============================================================
+-keep class com.google.android.gms.ads.** { *; }
+-keep class com.google.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**
+
+# ============================================================
+# SUPABASE / REALTIME / GOTRUE
+# ============================================================
+-keep class io.supabase.** { *; }
+-keep class com.supabase.** { *; }
+-dontwarn io.supabase.**
+-dontwarn com.supabase.**
+
+# OkHttp (used by Supabase)
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-keep class okio.** { *; }
+
+# ============================================================
+# IN-APP PURCHASE
+# ============================================================
+-keep class com.android.vending.billing.** { *; }
+-keep class com.google.android.gms.internal.play_billing.** { *; }
+-dontwarn com.android.vending.billing.**
+
+# ============================================================
+# GSON / JSON (used by Supabase)
+# ============================================================
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**
+-keep class com.google.gson.** { *; }
+-keep class * extends com.google.gson.TypeAdapter
+-keep class * implements com.google.gson.TypeAdapterFactory
+-keep class * implements com.google.gson.JsonSerializer
+-keep class * implements com.google.gson.JsonDeserializer
+
+# Keep generic signatures (for Supabase realtime)
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+
+# ============================================================
+# KOTLIN (required for some plugins)
+# ============================================================
+-keep class kotlin.** { *; }
+-keep class kotlin.Metadata { *; }
+-dontwarn kotlin.**
+-keepclassmembers class **$WhenMappings {
+    <fields>;
+}
+-keepclassmembers class kotlin.Metadata {
+    public <methods>;
+}
+
+# ============================================================
+# WEBVIEW (used by Google Ads)
+# ============================================================
+-keepclassmembers class * extends android.webkit.WebViewClient {
+    public void *(android.webkit.WebView, java.lang.String, android.graphics.Bitmap);
+    public boolean *(android.webkit.WebView, java.lang.String);
+}
+-keepclassmembers class * extends android.webkit.WebViewClient {
+    public void *(android.webkit.WebView, java.lang.String);
+}
+
+# ============================================================
+# PREVENT STRIPPING OF CRITICAL CLASSES
+# ============================================================
+-keep class androidx.lifecycle.** { *; }
+-keep class androidx.core.** { *; }
+-dontwarn androidx.**
+
+# Prevent R8 from removing classes used via reflection
+-keepclassmembers,allowobfuscation class * {
+  @com.google.gson.annotations.SerializedName <fields>;
+}

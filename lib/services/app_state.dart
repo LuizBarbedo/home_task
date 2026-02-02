@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,29 +45,45 @@ class AppState extends ChangeNotifier {
   bool get isCloudMode => _mode == AppMode.cloud;
 
   Future<void> init() async {
+    _isLoading = true;
+    
     try {
       await _storage.init();
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Erro ao inicializar storage: $e');
+      debugPrint('StackTrace: $stackTrace');
     }
     
     // Tenta inicializar Supabase se estiver configurado
     if (SupabaseConfig.isConfigured) {
       try {
-        await SupabaseService.initialize();
+        debugPrint('AppState: Iniciando inicialização do Supabase...');
+        
+        // Timeout para evitar travamento se o Supabase não responder
+        await SupabaseService.initialize().timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            debugPrint('AppState: Timeout ao inicializar Supabase');
+            throw TimeoutException('Supabase initialization timeout');
+          },
+        );
+        
         _mode = AppMode.cloud;
+        debugPrint('AppState: Supabase inicializado, modo cloud');
         
         // Verifica se há usuário autenticado
         final authUser = SupabaseService.currentAuthUser;
         if (authUser != null) {
+          debugPrint('AppState: Usuário autenticado encontrado: ${authUser.id}');
           _currentUser = await SupabaseService.getUserById(authUser.id);
           if (_currentUser?.groupId != null) {
             await loadGroupData(_currentUser!.groupId!);
           }
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
         // Se falhar, usa modo local
         debugPrint('Erro ao inicializar Supabase: $e');
+        debugPrint('StackTrace: $stackTrace');
         _mode = AppMode.local;
         try {
           await _loadCurrentUserLocal();
@@ -76,6 +93,7 @@ class AppState extends ChangeNotifier {
       }
     } else {
       // Supabase não configurado, usa modo local
+      debugPrint('AppState: Supabase não configurado, usando modo local');
       _mode = AppMode.local;
       try {
         await _loadCurrentUserLocal();
@@ -84,6 +102,7 @@ class AppState extends ChangeNotifier {
       }
     }
     
+    _isLoading = false;
     notifyListeners();
   }
 

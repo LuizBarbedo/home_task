@@ -12,10 +12,16 @@
         android:supportsRtl="true">
         
         <!-- Google AdMob App ID -->
-        <!-- IMPORTANTE: Substitua pelo seu App ID real antes de publicar -->
+        <!-- IMPORTANTE: Este ID deve corresponder ao configurado no AdMob Console -->
+        <!-- Se você ainda não configurou o AdMob, use o ID de teste do Google: ca-app-pub-3940256099942544~3347511713 -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-7552145998008928~4635471234"/>
+        
+        <!-- Delay na inicialização do AdMob para evitar ANR -->
+        <meta-data
+            android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+            android:value="true"/>
         
         <activity
             android:name=".MainActivity"
