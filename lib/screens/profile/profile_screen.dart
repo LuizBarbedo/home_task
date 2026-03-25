@@ -285,13 +285,29 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Actions
-                _ActionButton(
-                  icon: Icons.logout_rounded,
-                  label: 'Sair do Grupo',
-                  color: AppTheme.warningColor,
-                  onTap: () => _showLeaveGroupDialog(context),
-                ),
+                // Actions - Mostrar botões diferentes dependendo se tem grupo ou não
+                if (group != null) ...[
+                  _ActionButton(
+                    icon: Icons.logout_rounded,
+                    label: 'Sair do Grupo',
+                    color: AppTheme.warningColor,
+                    onTap: () => _showLeaveGroupDialog(context),
+                  ),
+                ] else ...[
+                  _ActionButton(
+                    icon: Icons.add_circle_outline_rounded,
+                    label: 'Criar Grupo',
+                    color: AppTheme.primaryColor,
+                    onTap: () => _showCreateGroupDialog(context),
+                  ),
+                  const SizedBox(height: 12),
+                  _ActionButton(
+                    icon: Icons.login_rounded,
+                    label: 'Entrar em um Grupo',
+                    color: AppTheme.secondaryColor,
+                    onTap: () => _showJoinGroupDialog(context),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _ActionButton(
                   icon: Icons.exit_to_app_rounded,
@@ -547,7 +563,7 @@ class ProfileScreen extends StatelessWidget {
   void _showLeaveGroupDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
             children: [
@@ -562,33 +578,256 @@ class ProfileScreen extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancelar'),
             ),
-            Consumer<AppState>(
-              builder: (context, appState, child) {
-                return ElevatedButton(
-                  onPressed: appState.isLoading
-                      ? null
-                      : () async {
-                          await appState.leaveGroup();
-                          if (context.mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => const GroupScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.warningColor,
-                  ),
-                  child: const Text('Sair'),
-                );
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _executeLeaveGroup(context);
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.warningColor,
+              ),
+              child: const Text('Sair'),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Future<void> _executeLeaveGroup(BuildContext context) async {
+    // Captura os objetos ANTES de qualquer operação assíncrona
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final appState = Provider.of<AppState>(context, listen: false);
+
+    // Mostra loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Saindo do grupo...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await appState.leaveGroup();
+
+      // Fecha o loading e navega para a tela de grupo
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const GroupScreen(),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      // Fecha o loading
+      navigator.pop();
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro ao sair do grupo: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  void _showCreateGroupDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Criar Grupo',
+                  style: AppTheme.headingSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Grupo',
+                    hintText: 'Ex: Família Silva',
+                    prefixIcon: Icon(Icons.group_outlined),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite o nome do grupo';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Consumer<AppState>(
+                  builder: (context, appState, child) {
+                    return ElevatedButton(
+                      onPressed: appState.isLoading
+                          ? null
+                          : () async {
+                              if (!formKey.currentState!.validate()) return;
+
+                              final success = await appState.createGroup(
+                                nameController.text.trim(),
+                              );
+
+                              if (sheetContext.mounted) {
+                                Navigator.of(sheetContext).pop();
+                                if (success) {
+                                  // MainScreen vai reconstruir automaticamente
+                                }
+                              }
+                            },
+                      child: appState.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text('Criar'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showJoinGroupDialog(BuildContext context) {
+    final codeController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Entrar no Grupo',
+                  style: AppTheme.headingSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: codeController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Código do Grupo',
+                    hintText: 'Ex: ABC123',
+                    prefixIcon: Icon(Icons.vpn_key_outlined),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite o código do grupo';
+                    }
+                    if (value.length < 6) {
+                      return 'O código deve ter 6 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Consumer<AppState>(
+                  builder: (context, appState, child) {
+                    return ElevatedButton(
+                      onPressed: appState.isLoading
+                          ? null
+                          : () async {
+                              if (!formKey.currentState!.validate()) return;
+
+                              final success = await appState.joinGroup(
+                                codeController.text.trim().toUpperCase(),
+                              );
+
+                              if (sheetContext.mounted) {
+                                if (success) {
+                                  Navigator.of(sheetContext).pop();
+                                  // MainScreen vai reconstruir automaticamente
+                                } else if (appState.error != null) {
+                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    SnackBar(
+                                      content: Text(appState.error!),
+                                      backgroundColor: AppTheme.errorColor,
+                                    ),
+                                  );
+                                  appState.clearError();
+                                }
+                              }
+                            },
+                      child: appState.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text('Entrar'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
         );
       },
     );

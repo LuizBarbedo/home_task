@@ -7,6 +7,7 @@ import '../tasks/tasks_screen.dart';
 import '../ranking/ranking_screen.dart';
 import '../profile/profile_screen.dart';
 import '../admin/admin_screen.dart';
+import '../group/group_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,6 +23,20 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
+        // Se o usuário não tem grupo, redireciona para a tela de grupo
+        if (appState.currentUser?.groupId == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const GroupScreen()),
+              (route) => false,
+            );
+          });
+          // Mostra loading enquanto redireciona
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         final isAdmin = appState.isAdmin;
         
         final screens = [
