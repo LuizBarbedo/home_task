@@ -79,12 +79,19 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()..init()),
         ChangeNotifierProvider(create: (_) => PurchaseService()..initialize()),
+        ChangeNotifierProvider(create: (_) => ThemeService()),
       ],
-      child: MaterialApp(
-        title: 'Tarefas em Casa',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const SplashScreen(),
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, child) {
+          return MaterialApp(
+            title: 'Tarefas em Casa',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }

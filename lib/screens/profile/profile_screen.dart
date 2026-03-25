@@ -393,21 +393,47 @@ class ProfileScreen extends StatelessWidget {
                 },
               ),
               const Divider(),
-              ListTile(
-                leading: const Icon(Icons.notifications_outlined),
-                title: const Text('Notificações'),
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {},
-                ),
+              Consumer<ThemeService>(
+                builder: (context, themeService, child) {
+                  return ListTile(
+                    leading: Icon(
+                      themeService.notificationsEnabled
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_off_outlined,
+                    ),
+                    title: const Text('Notificações'),
+                    trailing: Switch(
+                      value: themeService.notificationsEnabled,
+                      onChanged: (value) {
+                        themeService.setNotificationsEnabled(value);
+                      },
+                    ),
+                    onTap: () {
+                      themeService.toggleNotifications();
+                    },
+                  );
+                },
               ),
-              ListTile(
-                leading: const Icon(Icons.dark_mode_outlined),
-                title: const Text('Modo Escuro'),
-                trailing: Switch(
-                  value: false,
-                  onChanged: (value) {},
-                ),
+              Consumer<ThemeService>(
+                builder: (context, themeService, child) {
+                  return ListTile(
+                    leading: Icon(
+                      themeService.isDarkMode
+                          ? Icons.dark_mode_rounded
+                          : Icons.dark_mode_outlined,
+                    ),
+                    title: const Text('Modo Escuro'),
+                    trailing: Switch(
+                      value: themeService.isDarkMode,
+                      onChanged: (value) {
+                        themeService.setDarkMode(value);
+                      },
+                    ),
+                    onTap: () {
+                      themeService.toggleTheme();
+                    },
+                  );
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.info_outline),
