@@ -19,7 +19,7 @@ class AdMobConfig {
   
   /// ID do app iOS no AdMob
   /// Formato: ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX
-  static const String iosAppId = 'ca-app-pub-3940256099942544~1458002511'; // TESTE
+  static const String iosAppId = 'ca-app-pub-7552145998008928~5060720834'; // TESTE
   
   // ============================================================
   // IDs DOS BLOCOS DE ANÚNCIOS - TESTE (funcionam em desenvolvimento)
@@ -29,13 +29,13 @@ class AdMobConfig {
   static const String testBannerAndroid = 'ca-app-pub-3940256099942544/6300978111';
   
   /// Banner - iOS (teste)
-  static const String testBannerIos = 'ca-app-pub-3940256099942544/2934735716';
+  static const String testBannerIos = 'ca-app-pub-7552145998008928/2434557490';
   
   /// Intersticial - Android (teste)
   static const String testInterstitialAndroid = 'ca-app-pub-7552145998008928/4443899546';
   
   /// Intersticial - iOS (teste)
-  static const String testInterstitialIos = 'ca-app-pub-3940256099942544/4411468910';
+  static const String testInterstitialIos = 'ca-app-pub-7552145998008928/1346638850';
   
   /// Rewarded (vídeo com recompensa) - Android (teste)
   static const String testRewardedAndroid = 'ca-app-pub-3940256099942544/5224354917';
@@ -53,13 +53,13 @@ class AdMobConfig {
   
   /// Banner - iOS (produção)
   /// Substitua pelo seu ID real do AdMob
-  static const String prodBannerIos = 'YOUR_BANNER_AD_UNIT_ID_IOS';
+  static const String prodBannerIos = 'ca-app-pub-7552145998008928/2434557490';
   
   /// Intersticial - Android (produção)
   static const String prodInterstitialAndroid = 'ca-app-pub-7552145998008928/4443899546';
   
   /// Intersticial - iOS (produção)
-  static const String prodInterstitialIos = 'YOUR_INTERSTITIAL_AD_UNIT_ID_IOS';
+  static const String prodInterstitialIos = 'ca-app-pub-7552145998008928/1346638850';
   
   // ============================================================
   // CONFIGURAÇÕES
