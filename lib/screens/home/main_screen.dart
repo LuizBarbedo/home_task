@@ -165,10 +165,12 @@ class HomeTab extends StatelessWidget {
                             Text(
                               'Olá, ${user?.name.split(' ').first ?? ''}!',
                               style: AppTheme.headingSmall,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               group?.name ?? '',
                               style: AppTheme.bodySmall,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -275,25 +277,31 @@ class HomeTab extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${user?.weeklyPoints ?? 0} pontos',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${user?.weeklyPoints ?? 0} pontos',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  'Esta semana',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 14,
+                                  Text(
+                                    'Esta semana',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 14,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -436,17 +444,21 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
           Text(
             label,
             style: AppTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -514,6 +526,7 @@ class _RankingItem extends StatelessWidget {
               style: AppTheme.labelLarge.copyWith(
                 color: isCurrentUser ? AppTheme.primaryColor : null,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Row(

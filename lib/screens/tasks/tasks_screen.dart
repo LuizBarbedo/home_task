@@ -526,21 +526,24 @@ class _TaskCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              task.categoryName,
-                              style: TextStyle(
-                                color: color,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                task.categoryName,
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -689,11 +692,14 @@ class _CompletedTaskCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text(
-                      userName,
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w500,
+                    Flexible(
+                      child: Text(
+                        userName,
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),

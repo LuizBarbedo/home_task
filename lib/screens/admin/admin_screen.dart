@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/theme.dart';
+import 'task_packs_screen.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -144,6 +145,19 @@ class AdminScreen extends StatelessWidget {
                         label: 'Nova Tarefa',
                         color: AppTheme.successColor,
                         onTap: () => _showCreateTaskDialog(context),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ActionCard(
+                        icon: Icons.inventory_2_rounded,
+                        label: 'Pacotes',
+                        color: AppTheme.secondaryColor,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const TaskPacksScreen(),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -939,9 +953,12 @@ class _MemberCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      member.name,
-                      style: AppTheme.labelLarge,
+                    Flexible(
+                      child: Text(
+                        member.name,
+                        style: AppTheme.labelLarge,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     if (isAdmin) ...[
                       const SizedBox(width: 8),

@@ -473,11 +473,14 @@ class _RankingListItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      user.name,
-                      style: AppTheme.labelLarge.copyWith(
-                        color:
-                            isCurrentUser ? AppTheme.primaryColor : null,
+                    Flexible(
+                      child: Text(
+                        user.name,
+                        style: AppTheme.labelLarge.copyWith(
+                          color:
+                              isCurrentUser ? AppTheme.primaryColor : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isCurrentUser) ...[

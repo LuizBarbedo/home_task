@@ -61,6 +61,8 @@ class ProfileScreen extends StatelessWidget {
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
                       Text(
                         user?.email ?? '',
@@ -68,6 +70,8 @@ class ProfileScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 14,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
                       if (user?.isAdmin == true) ...[
                         const SizedBox(height: 8),
@@ -934,18 +938,22 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
           Text(
             label,
             style: AppTheme.bodySmall,
             textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -972,17 +980,21 @@ class _ActivityItem extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 24),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ),
         Text(
           label,
           style: AppTheme.bodySmall,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
