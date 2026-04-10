@@ -316,9 +316,108 @@ class SupabaseService {
   }
   
   // ============================================================
+  // NOTIFICAÇÕES INTERATIVAS
+  // ============================================================
+
+  /// Cria uma notificação para um usuário
+  static Future<NotificationModel> createNotification(
+    NotificationModel notification,
+  ) async {
+    final response = await _client
+        .from('notifications')
+        .insert(notification.toSupabase())
+        .select()
+        .single();
+
+    return NotificationModel.fromSupabase(response);
+  }
+
+  /// Cria várias notificações em lote
+  static Future<void> createNotificationsBatch(
+    List<NotificationModel> notifications,
+  ) async {
+    if (notifications.isEmpty) return;
+    await _client
+        .from('notifications')
+        .insert(notifications.map((n) => n.toSupabase()).toList());
+  }
+
+  /// Busca as notificações do usuário (mais recentes primeiro)
+  static Future<List<NotificationModel>> getNotificationsByUser(
+    String userId, {
+    int limit = 50,
+  }) async {
+    final response = await _client
+        .from('notifications')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((e) => NotificationModel.fromSupabase(e))
+        .toList();
+  }
+
+  /// Marca uma notificação como lida
+  static Future<void> markNotificationAsRead(String notificationId) async {
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('id', notificationId);
+  }
+
+  /// Marca todas as notificações do usuário como lidas
+  static Future<void> markAllNotificationsAsRead(String userId) async {
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('user_id', userId)
+        .eq('is_read', false);
+  }
+
+  /// Deleta uma notificação
+  static Future<void> deleteNotification(String notificationId) async {
+    await _client.from('notifications').delete().eq('id', notificationId);
+  }
+
+  /// Limpa todas as notificações do usuário
+  static Future<void> clearNotifications(String userId) async {
+    await _client.from('notifications').delete().eq('user_id', userId);
+  }
+
+  /// Escuta novas notificações do usuário em tempo real
+  static RealtimeChannel subscribeToNotifications(
+    String userId,
+    void Function(NotificationModel) onInsert,
+  ) {
+    return _client
+        .channel('notifications:$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            try {
+              final newRow = payload.newRecord;
+              onInsert(NotificationModel.fromSupabase(newRow));
+            } catch (_) {
+              // ignore parse errors
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  // ============================================================
   // REAL-TIME SUBSCRIPTIONS
   // ============================================================
-  
+
   /// Escuta mudanças nas tarefas do grupo
   static RealtimeChannel subscribeToTasks(
     String groupId,

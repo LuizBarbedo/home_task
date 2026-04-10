@@ -77,9 +77,11 @@ class _MainScreenState extends State<MainScreen> {
         ];
 
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
+          body: NotificationListenerOverlay(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: screens,
+            ),
           ),
           bottomNavigationBar: Column(
             mainAxisSize: MainAxisSize.min,
@@ -203,6 +205,8 @@ class HomeTab extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      const NotificationBell(),
                     ],
                   ),
                   const SizedBox(height: 24),

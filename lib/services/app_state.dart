@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/models.dart';
 import 'ad_service.dart';
+import 'funny_phrases.dart';
 import 'storage_service.dart';
 import 'supabase_service.dart';
 
@@ -24,25 +25,42 @@ class AppState extends ChangeNotifier {
   List<TaskModel> _tasks = [];
   List<TaskCompletionModel> _completions = [];
   List<UserModel> _groupMembers = [];
+  List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   String? _error;
   AppMode _mode = AppMode.local;
-  
+
+  /// Stream de notificações novas (pra mostrar toast/snackbar em tempo real)
+  final StreamController<NotificationModel> _newNotificationController =
+      StreamController<NotificationModel>.broadcast();
+
+  /// Marcas de pontos já notificadas (pra não enviar milestone duplicado)
+  final Set<int> _milestonesSent = {};
+
   // Subscriptions para real-time (Supabase)
   RealtimeChannel? _tasksSubscription;
   RealtimeChannel? _completionsSubscription;
   RealtimeChannel? _membersSubscription;
+  RealtimeChannel? _notificationsSubscription;
 
   UserModel? get currentUser => _currentUser;
   GroupModel? get currentGroup => _currentGroup;
   List<TaskModel> get tasks => _tasks;
   List<TaskCompletionModel> get completions => _completions;
   List<UserModel> get groupMembers => _groupMembers;
+  List<NotificationModel> get notifications => _notifications;
+  int get unreadNotificationCount =>
+      _notifications.where((n) => !n.isRead).length;
+  Stream<NotificationModel> get newNotificationStream =>
+      _newNotificationController.stream;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   AppMode get mode => _mode;
   bool get isCloudMode => _mode == AppMode.cloud;
+
+  /// Marcas de pontos que disparam notificação de milestone
+  static const List<int> _milestones = [50, 100, 250, 500, 1000];
 
   Future<void> init() async {
     _isLoading = true;
@@ -376,7 +394,18 @@ class AppState extends ChangeNotifier {
       _tasks = await SupabaseService.getTasksByGroup(groupId);
       _completions = await SupabaseService.getCompletionsByGroup(groupId);
       _groupMembers = await SupabaseService.getGroupMembers(groupId);
-      
+
+      // Carrega notificações do usuário atual
+      if (_currentUser != null) {
+        try {
+          _notifications =
+              await SupabaseService.getNotificationsByUser(_currentUser!.id);
+        } catch (e) {
+          debugPrint('Erro ao carregar notificações: $e');
+          _notifications = [];
+        }
+      }
+
       // Configurar subscriptions para real-time
       _setupRealtimeSubscriptions(groupId);
     } else {
@@ -393,21 +422,35 @@ class AppState extends ChangeNotifier {
 
   void _setupRealtimeSubscriptions(String groupId) {
     _cancelSubscriptions();
-    
+
     _tasksSubscription = SupabaseService.subscribeToTasks(groupId, (tasks) {
       _tasks = tasks;
       notifyListeners();
     });
-    
+
     _completionsSubscription = SupabaseService.subscribeToCompletions(groupId, (completions) {
       _completions = completions;
       notifyListeners();
     });
-    
+
     _membersSubscription = SupabaseService.subscribeToGroupMembers(groupId, (members) {
       _groupMembers = members;
       notifyListeners();
     });
+
+    // Subscription pra notificações do usuário atual
+    if (_currentUser != null) {
+      _notificationsSubscription = SupabaseService.subscribeToNotifications(
+        _currentUser!.id,
+        (notification) {
+          // Evita duplicar caso a notificação já tenha sido inserida localmente
+          if (_notifications.any((n) => n.id == notification.id)) return;
+          _notifications = [notification, ..._notifications];
+          _newNotificationController.add(notification);
+          notifyListeners();
+        },
+      );
+    }
   }
 
   void _cancelSubscriptions() {
@@ -422,6 +465,179 @@ class AppState extends ChangeNotifier {
     if (_membersSubscription != null) {
       SupabaseService.unsubscribe(_membersSubscription!);
       _membersSubscription = null;
+    }
+    if (_notificationsSubscription != null) {
+      SupabaseService.unsubscribe(_notificationsSubscription!);
+      _notificationsSubscription = null;
+    }
+  }
+
+  // ============================================================
+  // NOTIFICAÇÕES INTERATIVAS
+  // ============================================================
+
+  /// Detecta quem foi ultrapassado e dispara notificações engraçadas.
+  Future<void> _dispatchOvertakeNotifications({
+    required int oldPoints,
+    required int newPoints,
+    required bool wasFirstPlace,
+    required List<UserModel> membersSnapshot,
+    required TaskModel task,
+  }) async {
+    if (_mode != AppMode.cloud) return;
+    if (_currentUser == null || _currentGroup == null) return;
+
+    final me = _currentUser!;
+    final notifications = <NotificationModel>[];
+
+    // 1) Detecta usuários ultrapassados
+    final overtaken = <UserModel>[];
+    for (final member in membersSnapshot) {
+      if (member.id == me.id) continue;
+      // Tinha pontos > oldPoints (estava acima de mim) E agora < newPoints
+      if (member.weeklyPoints > oldPoints &&
+          member.weeklyPoints < newPoints) {
+        overtaken.add(member);
+      }
+    }
+
+    // Verifica se eu assumi o 1º lugar (alguém perdeu o trono)
+    UserModel? throneLoser;
+    if (!wasFirstPlace) {
+      // Quem era o líder antes?
+      final sortedBefore = List<UserModel>.from(membersSnapshot)
+        ..sort((a, b) => b.weeklyPoints.compareTo(a.weeklyPoints));
+      if (sortedBefore.isNotEmpty &&
+          sortedBefore.first.id != me.id &&
+          sortedBefore.first.weeklyPoints < newPoints &&
+          sortedBefore.first.weeklyPoints > 0) {
+        throneLoser = sortedBefore.first;
+      }
+    }
+
+    for (final member in overtaken) {
+      final isThroneLoser = throneLoser != null && throneLoser.id == member.id;
+      final type = isThroneLoser
+          ? AppNotificationType.throneStolen
+          : AppNotificationType.overtaken;
+      final message = FunnyPhrases.generate(
+        type,
+        name: me.name.split(' ').first,
+        points: newPoints,
+      );
+      notifications.add(
+        NotificationModel(
+          id: '',
+          userId: member.id,
+          fromUserId: me.id,
+          fromUserName: me.name,
+          groupId: _currentGroup!.id,
+          type: type,
+          message: message,
+          emoji: FunnyPhrases.emojiFor(type),
+          metadata: {
+            'task_title': task.title,
+            'points_earned': task.points,
+            'overtaker_points': newPoints,
+            'victim_points': member.weeklyPoints,
+          },
+        ),
+      );
+    }
+
+    // 2) Milestone pra mim mesmo
+    for (final mark in _milestones) {
+      if (oldPoints < mark && newPoints >= mark && !_milestonesSent.contains(mark)) {
+        _milestonesSent.add(mark);
+        final message = FunnyPhrases.generate(
+          AppNotificationType.milestone,
+          name: me.name.split(' ').first,
+          points: mark,
+        );
+        notifications.add(
+          NotificationModel(
+            id: '',
+            userId: me.id,
+            fromUserId: null,
+            fromUserName: null,
+            groupId: _currentGroup!.id,
+            type: AppNotificationType.milestone,
+            message: message,
+            emoji: FunnyPhrases.emojiFor(AppNotificationType.milestone),
+            metadata: {'milestone': mark},
+          ),
+        );
+      }
+    }
+
+    if (notifications.isEmpty) return;
+
+    try {
+      await SupabaseService.createNotificationsBatch(notifications);
+    } catch (e) {
+      debugPrint('Erro ao criar notificações: $e');
+    }
+  }
+
+  /// Marca uma notificação como lida
+  Future<void> markNotificationAsRead(String notificationId) async {
+    final index = _notifications.indexWhere((n) => n.id == notificationId);
+    if (index < 0) return;
+    final updated = _notifications[index].copyWith(isRead: true);
+    _notifications = [
+      ..._notifications.sublist(0, index),
+      updated,
+      ..._notifications.sublist(index + 1),
+    ];
+    notifyListeners();
+    if (_mode == AppMode.cloud) {
+      try {
+        await SupabaseService.markNotificationAsRead(notificationId);
+      } catch (e) {
+        debugPrint('Erro ao marcar notificação como lida: $e');
+      }
+    }
+  }
+
+  /// Marca todas as notificações como lidas
+  Future<void> markAllNotificationsAsRead() async {
+    if (_currentUser == null) return;
+    _notifications =
+        _notifications.map((n) => n.copyWith(isRead: true)).toList();
+    notifyListeners();
+    if (_mode == AppMode.cloud) {
+      try {
+        await SupabaseService.markAllNotificationsAsRead(_currentUser!.id);
+      } catch (e) {
+        debugPrint('Erro ao marcar todas como lidas: $e');
+      }
+    }
+  }
+
+  /// Limpa todas as notificações
+  Future<void> clearNotifications() async {
+    if (_currentUser == null) return;
+    _notifications = [];
+    notifyListeners();
+    if (_mode == AppMode.cloud) {
+      try {
+        await SupabaseService.clearNotifications(_currentUser!.id);
+      } catch (e) {
+        debugPrint('Erro ao limpar notificações: $e');
+      }
+    }
+  }
+
+  /// Deleta uma notificação específica
+  Future<void> deleteNotification(String notificationId) async {
+    _notifications = _notifications.where((n) => n.id != notificationId).toList();
+    notifyListeners();
+    if (_mode == AppMode.cloud) {
+      try {
+        await SupabaseService.deleteNotification(notificationId);
+      } catch (e) {
+        debugPrint('Erro ao deletar notificação: $e');
+      }
     }
   }
 
@@ -591,16 +807,34 @@ class AppState extends ChangeNotifier {
         notes: notes,
       );
 
+      // Snapshot dos pontos ANTES de completar (pra detectar overtake)
+      final oldPoints = _currentUser!.weeklyPoints;
+      final newPoints = oldPoints + task.points;
+      final wasFirstPlace =
+          getWeeklyRanking().isNotEmpty &&
+              getWeeklyRanking().first.id == _currentUser!.id;
+      // Snapshot dos membros (para detectar quem foi ultrapassado)
+      final membersSnapshot = List<UserModel>.from(_groupMembers);
+
       if (_mode == AppMode.cloud) {
         await SupabaseService.createCompletion(completion);
-        
+
         final updatedUser = _currentUser!.copyWith(
           weeklyPoints: _currentUser!.weeklyPoints + task.points,
           totalPoints: _currentUser!.totalPoints + task.points,
         );
         await SupabaseService.updateUser(updatedUser);
         _currentUser = updatedUser;
-        
+
+        // Dispara notificações pra quem foi ultrapassado
+        await _dispatchOvertakeNotifications(
+          oldPoints: oldPoints,
+          newPoints: newPoints,
+          wasFirstPlace: wasFirstPlace,
+          membersSnapshot: membersSnapshot,
+          task: task,
+        );
+
         await loadGroupData(_currentGroup!.id);
       } else {
         await _storage.saveCompletion(completion);
@@ -662,6 +896,7 @@ class AppState extends ChangeNotifier {
     if (!isAdmin || _currentGroup == null) return;
 
     _isLoading = true;
+    _milestonesSent.clear();
     notifyListeners();
 
     try {
@@ -817,6 +1052,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _cancelSubscriptions();
+    _newNotificationController.close();
     super.dispose();
   }
 }
